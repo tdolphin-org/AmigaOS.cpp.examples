@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 2)
     {
-        std::cerr << "Usage: " << argv[0] << " <url>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <host.name>" << std::endl;
         return 1;
     }
 
@@ -109,8 +109,10 @@ int main(int argc, char *argv[])
     } while ((msgLen > 0) && (msgToDoLen > 0));
 
     // response
+    std::string fullResponse;
     size_t bufferSize = 4096;
     std::unique_ptr<char[]> responseMessage(new char[bufferSize]);
+
     std::cout << "Response: " << std::endl;
 
     do
@@ -124,11 +126,20 @@ int main(int argc, char *argv[])
 
         if (msgLen > 0)
         {
+            std::cout << "@@ " << msgLen << " bytes read ... " << std::endl;
             if (msgLen < bufferSize)
                 responseMessage[msgLen] = '\0';
-            std::cout << "@@ bytes[" << msgLen << "] " << responseMessage.get() << std::endl;
+            fullResponse += responseMessage.get();
+
+            // very simple detection(s) of the end
+            if (fullResponse.substr(fullResponse.length() - std::string("</html>").length()) == "</html>")
+                break;
+            if (responseMessage[msgLen - 2] == '\r' && responseMessage[msgLen - 1] == '\n')
+                break;
         }
     } while (msgLen > 0);
+
+    std::cout << fullResponse << std::endl;
 
     return 0;
 }
