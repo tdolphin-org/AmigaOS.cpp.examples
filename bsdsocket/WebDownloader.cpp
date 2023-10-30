@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     // bsdsocket.library scope (open/close)
     BSDSocketBaseScope bsdSocketBaseScope;
 
-    auto bsdSocketLibBase = bsdSocketBaseScope.getBase();
+    auto bsdSocketLibBase = bsdSocketBaseScope.get();
     std::cout << bsdSocketLibBase->lib_Node.ln_Name << " version: " << bsdSocketLibBase->lib_Version
               << " revision: " << bsdSocketLibBase->lib_Revision << std::endl;
 
@@ -59,11 +59,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // IP conversion
-    UBYTE *p = (UBYTE *)hostEntry->h_addr;
-    ULONG addr = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
-    std::string ipAddress = Inet_NtoA(addr);
-
+    // IP for host name
+    std::string ipAddress = Inet_NtoA((*(in_addr *)(hostEntry->h_addr_list[0])).s_addr);
     std::cout << "Host ip address '" << hostEntry->h_name << "' length = " << hostEntry->h_length << " ip = " << ipAddress << std::endl;
 
     sockaddr_in hostAddr;
@@ -74,7 +71,7 @@ int main(int argc, char *argv[])
     hostAddr.sin_family = AF_INET;
 
     // initiate a connection on a socket
-    auto connectionResult = connect(socketScope.getSocket(), (sockaddr *)&hostAddr, sizeof(hostAddr));
+    auto connectionResult = connect(socketScope.get(), (sockaddr *)&hostAddr, sizeof(hostAddr));
     if (connectionResult != 0)
     {
         std::cerr << "Error connecting to host!" << std::endl
@@ -98,7 +95,7 @@ int main(int argc, char *argv[])
     // GET
     do
     {
-        msgLen = send(socketScope.getSocket(), (APTR)(requestHeaders.c_str() + msgOffset), msgToDoLen, 0);
+        msgLen = send(socketScope.get(), (APTR)(requestHeaders.c_str() + msgOffset), msgToDoLen, 0);
         if (msgLen == -1)
         {
             std::cerr << "Error sending message!" << std::endl;
@@ -118,7 +115,7 @@ int main(int argc, char *argv[])
 
     do
     {
-        msgLen = recv(socketScope.getSocket(), (APTR)responseMessage.get(), bufferSize - 1, 0);
+        msgLen = recv(socketScope.get(), (APTR)responseMessage.get(), bufferSize - 1, 0);
         if (msgLen == -1)
         {
             std::cerr << "Error receiving response!" << std::endl;
@@ -129,7 +126,7 @@ int main(int argc, char *argv[])
         {
             if (msgLen < bufferSize)
                 responseMessage[msgLen] = '\0';
-            std::cout << "bytes[" << msgLen << "]" << responseMessage.get() << std::endl;
+            std::cout << "@@ bytes[" << msgLen << "] " << responseMessage.get() << std::endl;
         }
     } while (msgLen > 0);
 

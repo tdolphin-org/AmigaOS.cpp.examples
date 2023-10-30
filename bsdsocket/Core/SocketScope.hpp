@@ -14,7 +14,7 @@ class SocketScope
     SocketScope(const long domain, const long type, const long protocol);
     ~SocketScope();
 
-    long getSocket() const
+    long get() const
     {
         return mSocket;
     }

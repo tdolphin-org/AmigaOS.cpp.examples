@@ -27,7 +27,7 @@ BSDSocketBaseScope::BSDSocketBaseScope()
         throw std::runtime_error(error);
     }
 
-    if (!(SocketBase = OpenLibrary(SOCKETNAME, 0)))
+    if (!(SocketBase = OpenLibrary(SOCKETNAME, 4)))
     {
         std::string error = (std::string) __PRETTY_FUNCTION__ + " failed to open " + SOCKETNAME;
         throw std::runtime_error(error);
@@ -43,7 +43,7 @@ BSDSocketBaseScope::~BSDSocketBaseScope()
     }
 }
 
-Library *BSDSocketBaseScope::getBase() const
+Library *BSDSocketBaseScope::get() const
 {
     return SocketBase;
 }

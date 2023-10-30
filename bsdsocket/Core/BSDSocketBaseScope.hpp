@@ -12,5 +12,5 @@ class BSDSocketBaseScope
     BSDSocketBaseScope();
     ~BSDSocketBaseScope();
 
-    Library *getBase() const;
+    Library *get() const;
 };
