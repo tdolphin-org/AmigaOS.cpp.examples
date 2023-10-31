@@ -18,13 +18,16 @@
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2)
+    if (argc != 2)
     {
-        std::cerr << "Usage: " << argv[0] << " <host.name>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <http.host.name/path.to.resource>" << std::endl
+                  << "e.g.: " << argv[0] << " aminet.net/tree?path=biz" << std::endl;
         return 1;
     }
 
-    std::string hostName = argv[1];
+    std::string arg = argv[1];
+    auto pos = arg.find("/");
+    std::string hostName = arg.substr(0, pos), resource = pos == std::string::npos ? "/" : arg.substr(pos);
 
     // bsdsocket.library scope (open/close)
     BSDSocketBaseScope bsdSocketBaseScope;
@@ -84,13 +87,13 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::cout << "Connection established" << std::endl;
+    std::cout << "Connection established." << std::endl << std::endl;
 
     std::string requestHeaders
-        = "GET / HTTP/1.1\r\nHost: " + hostName + "\r\n" + "User-Agent: " + argv[0] + " \r\n" + "Accept: */*\r\n\r\n";
+        = "GET " + resource + " HTTP/1.1\r\nHost: " + hostName + "\r\n" + "User-Agent: " + argv[0] + " \r\n" + "Accept: */*\r\n\r\n";
     long msgLen = 0, msgToDoLen = requestHeaders.length(), msgOffset = 0;
 
-    std::cout << "Request headers:" << std::endl << requestHeaders << std::endl;
+    std::cout << "Request HEADERS:" << std::endl << requestHeaders << std::endl;
 
     // GET
     do
@@ -109,15 +112,17 @@ int main(int argc, char *argv[])
     } while ((msgLen > 0) && (msgToDoLen > 0));
 
     // response
-    std::string fullResponse;
+    std::string fullResponse, responseHeaders;
+    bool responseHeadersDetected = false;
+    bool transferEncodingChunked = false;
     size_t bufferSize = 4096;
-    std::unique_ptr<char[]> responseMessage(new char[bufferSize]);
+    std::unique_ptr<char[]> buffer(new char[bufferSize]);
 
-    std::cout << "Response: " << std::endl;
+    std::cout << "Response:" << std::endl;
 
     do
     {
-        msgLen = recv(socketScope.get(), (APTR)responseMessage.get(), bufferSize - 1, 0);
+        msgLen = recv(socketScope.get(), (APTR)buffer.get(), bufferSize - 1, 0);
         if (msgLen == -1)
         {
             std::cerr << "Error receiving response!" << std::endl;
@@ -127,19 +132,75 @@ int main(int argc, char *argv[])
         if (msgLen > 0)
         {
             std::cout << "@@ " << msgLen << " bytes read ... " << std::endl;
-            if (msgLen < bufferSize)
-                responseMessage[msgLen] = '\0';
-            fullResponse += responseMessage.get();
+            buffer[msgLen] = '\0';
+            fullResponse += buffer.get();
+
+            if (!responseHeadersDetected)
+            {
+                auto pos = fullResponse.find("\n\r");
+                if (pos != std::string::npos)
+                {
+                    responseHeadersDetected = true;
+                    responseHeaders = fullResponse.substr(0, pos + 2);
+                    std::cout << "Response HEADERS:" << std::endl << responseHeaders << std::endl;
+
+                    // detect 404
+                    auto pos404 = responseHeaders.find("404 Not Found");
+                    if (pos404 != std::string::npos)
+                        break;
+
+                    // detect 'chunked'
+                    auto posChunked = responseHeaders.find("Transfer-Encoding: chunked");
+                    transferEncodingChunked = posChunked != std::string::npos;
+                    fullResponse = fullResponse.substr(pos + 2); // remove headers
+                }
+            }
 
             // very simple detection(s) of the end
-            if (fullResponse.substr(fullResponse.length() - std::string("</html>").length()) == "</html>")
+            if (fullResponse.length() >= 7 && fullResponse.substr(fullResponse.length() - std::string("</html>").length()) == "</html>")
                 break;
-            if (responseMessage[msgLen - 2] == '\r' && responseMessage[msgLen - 1] == '\n')
+            if (transferEncodingChunked)
+            {
+                if (fullResponse.length() >= 5 && fullResponse.substr(fullResponse.length() - 5) == "0\r\n\r\n")
+                    break;
+            }
+            else if (fullResponse.length() >= 2 && fullResponse.substr(fullResponse.length() - 2) == "\r\n")
                 break;
         }
     } while (msgLen > 0);
 
-    std::cout << fullResponse << std::endl;
+    // postprocess response message
+    if (transferEncodingChunked)
+    {
+        std::string posprocessedResponse;
+        unsigned long chunkSize;
+        std::size_t pos = 0;
+
+        do
+        {
+            std::cout << "pos: " << pos << std::endl;
+            pos = fullResponse.find_first_of("0123456789abcdf", pos);
+            if (pos == std::string::npos)
+            {
+                std::cerr << "Error postprocessing chunked response!" << std::endl;
+                return 1;
+            }
+            auto posEnd = fullResponse.find("\r\n", pos);
+
+            // convert hex to number
+            std::stringstream ss;
+            ss << std::hex << fullResponse.substr(pos, posEnd - pos);
+            ss >> chunkSize;
+
+            std::cout << "@@ chunkSize: " << chunkSize << std::endl;
+            posprocessedResponse += fullResponse.substr(posEnd + 2, chunkSize);
+            pos = posEnd + 2 + chunkSize;
+        } while (chunkSize > 0);
+
+        std::cout << "RESPONSE CONTENT:" << std::endl << posprocessedResponse << std::endl;
+    }
+    else
+        std::cout << fullResponse << std::endl;
 
     return 0;
 }
