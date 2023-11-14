@@ -51,9 +51,9 @@ void ExecuteSystem(const std::string &path, const std::string &command)
 
                 if (res != -1)
                 {
-                    // no Close(error) and no Close(output)
-                    // because for "SYS_Asynch,TRUE", error & output are closed by SystemTags (see AmigaOS Autodocs)
-
+                    // no Close(error) and no Close(output) and no UnLock(lock)
+                    // because for "SYS_Asynch,TRUE", error & output are closed, lock is unlocked by SystemTags (see AmigaOS Autodocs)
+                    lock = 0L;
                     std::cout << "SystemTags() ... ok" << std::endl;
                 }
                 else
@@ -74,7 +74,8 @@ void ExecuteSystem(const std::string &path, const std::string &command)
 
         std::cout << "going to UnLock()" << std::endl;
 
-        UnLock(lock);
+        if (lock)
+            UnLock(lock);
     }
     else
         std::cout << "error Lock(" + path + ")" << std::endl;
