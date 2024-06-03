@@ -14,10 +14,7 @@
 
 #include <stdexcept>
 
-#include <utility/tagitem.h>
-
 #include <libraries/amisslmaster.h>
-#include <proto/amisslmaster.h>
 #include <proto/exec.h>
 
 #define AMISSLMASTERNAME "amisslmaster.library"
@@ -35,17 +32,7 @@ AmiSSLMasterBaseScope::AmiSSLMasterBaseScope()
     if (!(AmiSSLMasterBase = OpenLibrary(AMISSLMASTERNAME, AMISSLMASTER_MIN_VERSION)))
     {
         std::string error = (std::string) __PRETTY_FUNCTION__ + " failed to open " + AMISSLMASTERNAME + " min version "
-            + std::to_string(AMISSLMASTER_MIN_VERSION);
-        throw std::runtime_error(error);
-    }
-
-    if (!InitAmiSSLMaster(AMISSL_CURRENT_VERSION, TRUE))
-    {
-        CloseLibrary(AmiSSLMasterBase);
-        AmiSSLMasterBase = nullptr;
-
-        std::string error = (std::string) __PRETTY_FUNCTION__ + " failed to initialize, AmiSSL version is too old! required version "
-            + std::to_string(AMISSL_CURRENT_VERSION);
+            + std::to_string(AMISSLMASTER_MIN_VERSION) + "!";
         throw std::runtime_error(error);
     }
 }
